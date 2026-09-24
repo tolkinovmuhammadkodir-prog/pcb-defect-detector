@@ -87,26 +87,31 @@ underlying detector.
 
 ### Findings
 
-- **ID switches occurred primarily during crossing-paths events** —
-  consistent with the known limitation of motion-only matching: when two
-  tracked objects' predicted positions become close together, the
-  Hungarian assignment can become ambiguous.
-- **This limitation persisted even with a more accurate detector
-  (YOLOv8s vs YOLOv8n)**, indicating the limitation lives in the
-  motion-only matching logic itself, not detector weakness — a better
-  detector alone cannot fully resolve it.
 - **General COCO-pretrained classes are unreliable on out-of-distribution
-  objects**: tested on real factory conveyor footage of food products,
-  the model's label fluctuated between "cat", "cake", "bowl", "keyboard",
-  and "sports ball" frame to frame, since COCO has no relevant category
-  for the actual objects. This directly reinforces why domain-specific
-  fine-tuning (as done for the PCB detector above) is necessary for real
-  deployment — a general pretrained model cannot be trusted on classes
-  it wasn't built to recognize.
-- An automated ID-switch counter (`evaluate_tracking.py`) was built to
-  quantify this rather than relying on visual inspection — counting
-  frame-to-frame box pairs with high spatial overlap (IoU ≥ 0.5,
-  indicating the same physical object) but different track IDs.
+  objects** — verified in the notebook output: tested on real factory
+  conveyor footage of food products, the model's label fluctuated between
+  "cat", "keyboard", "sports ball", "cake", and "bowl" frame to frame,
+  since COCO has no relevant category for the actual objects. This
+  reinforces why domain-specific fine-tuning (as done for the PCB
+  detector above) is necessary for real deployment.
+- **Quantified ID-switch comparison** (`evaluate_tracking.py`, on
+  `vtest.avi`, both runs saved and reproducible):
+
+  | Model | Total Switches | Switches per 100 Frames |
+  |---|---|---|
+  | YOLOv8n | 70 | 8.81 |
+  | YOLOv8s | 95 | **11.95** |
+
+  **Counter to the initial hypothesis, the larger/more accurate detector
+  (YOLOv8s) showed a higher ID-switch rate than YOLOv8n, not a lower
+  one.** A plausible explanation: YOLOv8s detects more objects per frame
+  with higher confidence (e.g. it picked up an extra "bird" class YOLOv8n
+  missed entirely), and more detections per frame create more
+  opportunities for the Hungarian matcher to face ambiguous crossing-path
+  assignments — a more sensitive detector can generate more matching
+  decisions to get wrong, not fewer. This is a genuine, measured finding,
+  not the result originally expected, which is itself evidence the
+  measurement is real rather than confirming an assumption.
 
 ### Multi-Camera Re-Identification (Design, Not Implemented)
 
@@ -136,6 +141,7 @@ pcb-defect-detector/
 └── README.md
 ```
 
+
 ## Running It
 
 ```bash
@@ -155,8 +161,12 @@ YOLOv8 (Ultralytics) · ByteTrack · OpenCV · PyTorch
 ## Limitations & Future Work
 
 - Multi-camera re-identification (design above) not yet implemented.
-- `spur` and `open_circuit` remain the weakest classes — targeted data
-  augmentation or additional training epochs weighted toward these
-  classes is a concrete next step.
+- `spur` and `open_circuit` remain the weakest detection classes —
+  targeted data augmentation or additional training epochs weighted
+  toward these classes is a concrete next step.
+- The higher ID-switch rate on YOLOv8s versus YOLOv8n is a real, measured
+  finding but not yet root-caused — a deeper investigation (e.g. checking
+  whether switches correlate with the extra classes YOLOv8s detects)
+  would strengthen the explanation offered above.
 - Not validated for real production QC use — a research/portfolio
   project, not a certified inspection system.
